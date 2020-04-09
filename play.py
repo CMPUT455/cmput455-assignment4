@@ -1,13 +1,13 @@
 import pexpect
 
-player1='random_player/nogo_random.py'
-player2='nogo4/nogo4.py'
+player1='nogo4/nogo4.py'
+player2='random_player/nogo_random.py'
 
 win1=0
 win2=0
 numTimeout=0
 
-TIMEOUT=30
+TIMEOUT=40
 SAFETY_MARGIN=1 
 
 def getMove(p,color):
