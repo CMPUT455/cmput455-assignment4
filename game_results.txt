@@ -1,4 +1,0 @@
-player 1: random_player/nogo_random.py
-player 2: assignment3/Nogo.py
-player 1 wins 10
-player 2 wins 0
