@@ -42,10 +42,11 @@ class Nogo():
         Passe/resigns only at the end of game.
 
         """
-        self.name = "NoGoAssignment3"
+        self.name = "NoGoAssignment4"
         self.version = 3.0
         self.sim = N
         self.use_ucb = ucb
+        self.best_move = None
           
     def simulate(self, board, move, toplay):
         """
@@ -73,17 +74,16 @@ class Nogo():
         Run one-ply MC simulations to get a move to play.
         """
         cboard = board.copy()
-        emptyPoints = board.get_empty_points()
-        moves = []
-        for p in emptyPoints:
-            if board.is_legal(p, color):
-                moves.append(p)
-#        if not moves:
- #           return None
-        if self.use_ucb:
-            C = 0.4 #sqrt(2) is safe, this is more aggressive
-            best = ucb.runUcb(self, cboard, C, moves, color)
-            return best
+        moves = GoBoardUtil.generate_legal_moves(board, board.current_player)
+        self.best_move = moves[0]
+        if not moves:
+            return None
+
+        C = 0.4 #sqrt(2) is safe, this is more aggressive
+        best = ucb.runUcb(self, cboard, C, moves, color)
+        return best
+        
+        '''
         else:
             moveWins = []
             for move in moves:
@@ -91,6 +91,7 @@ class Nogo():
                 moveWins.append(wins)
             writeMoves(cboard, moves, moveWins, self.sim)
             return select_best_move(board, moves, moveWins)
+        '''
 
 def run(sim, selection):
     """
