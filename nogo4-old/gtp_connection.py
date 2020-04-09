@@ -8,15 +8,11 @@ at the University of Edinburgh.
 """
 import traceback
 from sys import stdin, stdout, stderr
-from board_util import GoBoardUtil, BLACK, WHITE, EMPTY, BORDER, PASS, \
+from board_util import GoBoardUtil, BLACK, WHITE, EMPTY, BORDER, \
                        MAXSIZE, coord_to_point
 import numpy as np
 import re
-from pattern_util import PatternUtil
-import os
 import signal
-
-POLICY = ""
 
 class GtpConnection():
 
@@ -34,6 +30,7 @@ class GtpConnection():
         self._debug_mode = debug_mode
         self.go_engine = go_engine
         self.board = board
+        signal.signal(signal.SIGALRM, self.handler)
         self.commands = {
             "protocol_version": self.protocol_version_cmd,
             "quit": self.quit_cmd,
@@ -48,10 +45,6 @@ class GtpConnection():
             "list_commands": self.list_commands_cmd,
             "play": self.play_cmd,
             "legal_moves": self.legal_moves_cmd,
-            "num_sim": self.num_sim_cmd,
-            "policy": self.policy_cmd,
-            "selection": self.selection_cmd,
-            "policy_moves": self.policy_moves_cmd,
             "gogui-rules_game_id": self.gogui_rules_game_id_cmd,
             "gogui-rules_board_size": self.gogui_rules_board_size_cmd,
             "gogui-rules_legal_moves": self.gogui_rules_legal_moves_cmd,
@@ -61,7 +54,7 @@ class GtpConnection():
             "gogui-analyze_commands": self.gogui_analyze_cmd,
             "timelimit": self.timelimit_cmd
         }
-        self.timelimit = 30
+        self.timelimit = 30 
 
         # used for argument checking
         # values: (required number of arguments, 
@@ -72,25 +65,16 @@ class GtpConnection():
             "known_command": (1, 'Usage: known_command CMD_NAME'),
             "genmove": (1, 'Usage: genmove {w,b}'),
             "play": (2, 'Usage: play {b,w} MOVE'),
-            "num_sim": (1, 'Usage: num_sim #(e.g. num_sim 100 )'),
-            "policy": (1, 'Usage: policy {random,pattern}'),
-            "selection": (1, 'Usage: selection {rr,ucb}'),
-            "legal_moves": (1, 'Usage: legal_moves {w,b}'),
+            "legal_moves": (1, 'Usage: legal_moves {w,b}')
         }
-        # index the weights file
-        self.prob_table = {}
-        PATH = os.getcwd()
-        with open(PATH + "/assignment3/weights") as f:
-            for line in f:
-                (key, val) = line.split()
-                self.prob_table[int(key)] = float(val)
-
-        
-
+    
     def timelimit_cmd(self, args):
         self.timelimit = args[0]
         self.respond('')
 
+    def handler(self, signum, fram):
+        self.board = self.sboard
+        raise Exception("unknown")
 
     def write(self, data):
         stdout.write(data) 
@@ -196,62 +180,6 @@ class GtpConnection():
         self.reset(self.board.size)
         self.respond()
 
-    def num_sim_cmd(self, args):
-        """ set number of simulations """
-        self.go_engine.sim = int(args[0])
-        self.respond()
-
-    def policy_cmd(self, args):
-        """ set policy """
-        if args[0].lower() != "random" and args[0].lower() != "pattern":
-            self.respond("Error: Unknown policy was inputted.")
-        else:
-            global POLICY
-            POLICY = args[0].lower()
-        self.respond()
-            # self.respond("Success: Policy has been set to " + POLICY + ".")
-
-    def selection_cmd(self, args):
-        """ set move selection """
-        if args[0] == 'ucb':
-            self.go_engine.use_ucb = True
-        else:
-            self.go_engine.use_ucb = False
-        self.respond()
-
-    def policy_moves_cmd(self, args):
-        """ prints set of moves and probabilities """
-        empties = self.board.get_empty_points()
-        color = self.board.current_player
-        legal_moves = []
-        for move in empties:
-            if self.board.is_legal(move, color):
-                legal_moves.append(move)
-        moves = []
-        sorted_probs = ""
-        if POLICY == "random":
-            rand_prob = round(1/len(legal_moves), 3)
-            for move in legal_moves:
-                coords = point_to_coord(move, self.board.size)
-                sorted_probs += (' ' + str(rand_prob))
-                moves.append(format_point(coords).lower())
-            moves.sort()
-        else:
-            move_probs = {}
-            probs_sum = 0
-            for move in legal_moves:
-                coords = point_to_coord(move, self.board.size)
-                point_prob = self.get_point_probability(move)
-                probs_sum += point_prob
-                move_probs[format_point(coords).lower()] = point_prob
-                moves.append(format_point(coords).lower())
-            moves.sort()
-            for m in moves:
-                sorted_probs += (' ' + str(round(move_probs[m]/probs_sum, 3)))
-        sorted_moves = ' '.join(moves)
-        output = sorted_moves + sorted_probs
-        self.respond(output)
-
     def boardsize_cmd(self, args):
         """
         Reset the game with new boardsize args[0]
@@ -329,19 +257,36 @@ class GtpConnection():
 
     def genmove_cmd(self, args):
         """
-        Generate a move for the color args[0] in {'b', 'w'}, for the game of gomoku.
+        Generate a move for the color args[0] in {'b', 'w'}, for the game of nogo.
         """
         board_color = args[0].lower()
         color = color_to_int(board_color)
+        assert color == self.board.current_player
+
+        # check if the game ends
+        legal_moves = GoBoardUtil.generate_legal_moves(self.board, self.board.current_player)
+        if not legal_moves:
+            self.respond("resign")
+            self.board.current_player = GoBoardUtil.opponent(self.board.current_player)
+            return 
+
+        move = None
         try:
-            signal.alarm(int(self.timelimit)-2)
+            signal.alarm(int(self.timelimit))
+            self.sboard = self.board.copy()
             move = self.go_engine.get_move(self.board, color)
+            self.board=self.sboard
             signal.alarm(0)
         except Exception as e:
             move=self.go_engine.best_move
+
+        if move is None:
+            self.respond("resign")
+            self.board.current_player = GoBoardUtil.opponent(self.board.current_player)
+            return 
+
         move_coord = point_to_coord(move, self.board.size)
         move_as_string = format_point(move_coord)
-
         if self.board.is_legal(move, color):
             self.board.play_move(move, color)
             self.respond(move_as_string)
@@ -427,44 +372,13 @@ class GtpConnection():
                      "pstring/Show Board/gogui-rules_board\n"
                      )
 
-    def get_point_probability(self, point):
-        """
-        Get the pattern around point.
-        Returns
-        -------
-        patterns :
-        Set of patterns in the same format of what michi pattern base provides. Please refer to pattern.py to see the format of the pattern.
-        """
-        positions = [point - self.board.NS - 1, point - self.board.NS, point - self.board.NS + 1,
-                     point - 1, point, point + 1,
-                     point + self.board.NS - 1, point + self.board.NS, point + self.board.NS + 1]
-        number = ""
-
-        for index, d in enumerate(reversed(positions)):
-            if index == 4:
-                pass
-            elif self.board.board[d] == 1:
-                number += str(self.board.current_player)
-            elif self.board.board[d] == 2:
-                number += str(GoBoardUtil.opponent(self.board.current_player))
-            elif self.board.board[d] == EMPTY:
-                number += '0'
-            elif self.board.board[d] == BORDER:
-                number += '3'
-        output = self.prob_table[base_4_to_10(number)]
-        return output
-
 def point_to_coord(point, boardsize):
     """
     Transform point given as board array index 
     to (row, col) coordinate representation.
-    Special case: PASS is not transformed
     """
-    if point == PASS:
-        return PASS
-    else:
-        NS = boardsize + 1
-        return divmod(point, NS)
+    NS = boardsize + 1
+    return divmod(point, NS)
 
 def format_point(move):
     """
@@ -472,8 +386,6 @@ def format_point(move):
     """
     column_letters = "ABCDEFGHJKLMNOPQRSTUVWXYZ"
     #column_letters = "abcdefghjklmnopqrstuvwxyz"
-    if move == PASS:
-        return "pass"
     row, col = move
     if not 0 <= row < MAXSIZE or not 0 <= col < MAXSIZE:
         raise ValueError
@@ -489,7 +401,7 @@ def move_to_coord(point_str, board_size):
         raise ValueError("board_size out of range")
     s = point_str.lower()
     if s == "pass":
-        return PASS
+        raise ValueError("pass")
     try:
         col_c = s[0]
         if (not "a" <= col_c <= "z") or col_c == "i":
@@ -512,12 +424,4 @@ def color_to_int(c):
     """convert character to the appropriate integer code"""
     color_to_int = {"b": BLACK , "w": WHITE, "e": EMPTY, 
                     "BORDER": BORDER}
-    return color_to_int[c]
-
-
-def base_4_to_10(number):
-    result = 0
-    for index, character in enumerate(number):
-        result += int(character) * 4 ** index
-    return result
-
+    return color_to_int[c] 
