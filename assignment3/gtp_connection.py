@@ -13,6 +13,8 @@ from board_util import GoBoardUtil, BLACK, WHITE, EMPTY, BORDER, PASS, \
 import numpy as np
 import re
 from pattern_util import PatternUtil
+import os
+import signal
 
 POLICY = ""
 
@@ -56,8 +58,10 @@ class GtpConnection():
             "gogui-rules_side_to_move": self.gogui_rules_side_to_move_cmd,
             "gogui-rules_board": self.gogui_rules_board_cmd,
             "gogui-rules_final_result": self.gogui_rules_final_result_cmd,
-            "gogui-analyze_commands": self.gogui_analyze_cmd
+            "gogui-analyze_commands": self.gogui_analyze_cmd,
+            "timelimit": self.timelimit_cmd
         }
+        self.timelimit = 30
 
         # used for argument checking
         # values: (required number of arguments, 
@@ -71,14 +75,22 @@ class GtpConnection():
             "num_sim": (1, 'Usage: num_sim #(e.g. num_sim 100 )'),
             "policy": (1, 'Usage: policy {random,pattern}'),
             "selection": (1, 'Usage: selection {rr,ucb}'),
-            "legal_moves": (1, 'Usage: legal_moves {w,b}')
+            "legal_moves": (1, 'Usage: legal_moves {w,b}'),
         }
         # index the weights file
         self.prob_table = {}
-        with open("weights") as f:
+        PATH = os.getcwd()
+        with open(PATH + "/assignment3/weights") as f:
             for line in f:
                 (key, val) = line.split()
                 self.prob_table[int(key)] = float(val)
+
+        
+
+    def timelimit_cmd(self, args):
+        self.timelimit = args[0]
+        self.respond('')
+
 
     def write(self, data):
         stdout.write(data) 
@@ -321,12 +333,18 @@ class GtpConnection():
         """
         board_color = args[0].lower()
         color = color_to_int(board_color)
-        move = self.go_engine.get_move(self.board, color)
+        try:
+            signal.alarm(int(self.timelimit - 3))
+            move = self.go_engine.get_move(self.board, color)
+            signal.alarm(0)
+        except:
+            move=self.go_engine.best_move
         move_coord = point_to_coord(move, self.board.size)
         move_as_string = format_point(move_coord)
+
         if self.board.is_legal(move, color):
             self.board.play_move(move, color)
-            self.respond(move_as_string.lower())
+            self.respond(move_as_string)
         else:
             self.respond("resign")
 
