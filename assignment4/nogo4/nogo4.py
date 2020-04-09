@@ -1,6 +1,7 @@
 from gtp_connection import GtpConnection
 from board_util import GoBoardUtil, EMPTY, BLACK, WHITE
 from simple_board import SimpleGoBoard
+import ucb
 
 import numpy as np
 import random 
@@ -49,7 +50,7 @@ class NoGoFlatMC():
         result = 1.0 if res == toplay else 0.0
         return result
 
-    def get_move(self, original_board, color):
+    # def get_move(self, original_board, color):
         """
         The genmove function using one-ply MC search.
         """
@@ -82,6 +83,31 @@ class NoGoFlatMC():
             assert best_move is not None 
         return best_move
 
+    # From assignment 3
+    def get_move(self, board, color):
+        """
+        Run one-ply MC simulations to get a move to play.
+        """
+        cboard = board.copy()
+        emptyPoints = board.get_empty_points()
+        moves = []
+        use_ucb = True
+        for p in emptyPoints:
+            if board.is_legal(p, color):
+                moves.append(p)
+#        if not moves:
+ #           return None
+        if use_ucb:
+            C = 0.4 #sqrt(2) is safe, this is more aggressive
+            best = ucb.runUcb(self, cboard, C, moves, color)
+            return best
+        else:
+            moveWins = []
+            for move in moves:
+                wins = self.simulateMove(cboard, move, color)
+                moveWins.append(wins)
+            writeMoves(cboard, moves, moveWins, self.sim)
+           
 def run():
     """
     start the gtp connection and wait for commands.

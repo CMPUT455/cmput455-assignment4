@@ -255,43 +255,60 @@ class GtpConnection():
         except Exception as e:
             self.respond('illegal move: \"{} {}\" {}'.format(args[0], args[1], str(e)))
 
+    # def genmove_cmd(self, args):
+        # """
+        # Generate a move for the color args[0] in {'b', 'w'}, for the game of nogo.
+        # """
+        # board_color = args[0].lower()
+        # color = color_to_int(board_color)
+        # assert color == self.board.current_player
+
+        # # check if the game ends
+        # legal_moves = GoBoardUtil.generate_legal_moves(self.board, self.board.current_player)
+        # if not legal_moves:
+        #     self.respond("resign")
+        #     self.board.current_player = GoBoardUtil.opponent(self.board.current_player)
+        #     return 
+
+        # move = None
+        # try:
+        #     signal.alarm(int(self.timelimit))
+        #     self.sboard = self.board.copy()
+        #     move = self.go_engine.get_move(self.board, color)
+        #     self.board=self.sboard
+        #     signal.alarm(0)
+        # except Exception as e:
+        #     move=self.go_engine.best_move
+
+        # if move is None:
+        #     self.respond("resign")
+        #     self.board.current_player = GoBoardUtil.opponent(self.board.current_player)
+        #     return 
+
+        # move_coord = point_to_coord(move, self.board.size)
+        # move_as_string = format_point(move_coord)
+        # if self.board.is_legal(move, color):
+        #     self.board.play_move(move, color)
+        #     self.respond(move_as_string)
+        # else:
+        #     self.respond("resign")
+
+    # From assignment 3
     def genmove_cmd(self, args):
         """
-        Generate a move for the color args[0] in {'b', 'w'}, for the game of nogo.
+        Generate a move for the color args[0] in {'b', 'w'}, for the game of gomoku.
         """
         board_color = args[0].lower()
         color = color_to_int(board_color)
-        assert color == self.board.current_player
-
-        # check if the game ends
-        legal_moves = GoBoardUtil.generate_legal_moves(self.board, self.board.current_player)
-        if not legal_moves:
-            self.respond("resign")
-            self.board.current_player = GoBoardUtil.opponent(self.board.current_player)
-            return 
-
-        move = None
-        try:
-            signal.alarm(int(self.timelimit))
-            self.sboard = self.board.copy()
-            move = self.go_engine.get_move(self.board, color)
-            self.board=self.sboard
-            signal.alarm(0)
-        except Exception as e:
-            move=self.go_engine.best_move
-
-        if move is None:
-            self.respond("resign")
-            self.board.current_player = GoBoardUtil.opponent(self.board.current_player)
-            return 
-
+        move = self.go_engine.get_move(self.board, color)
         move_coord = point_to_coord(move, self.board.size)
         move_as_string = format_point(move_coord)
         if self.board.is_legal(move, color):
             self.board.play_move(move, color)
-            self.respond(move_as_string)
+            self.respond(move_as_string.lower())
         else:
             self.respond("resign")
+
 
     def gogui_rules_game_id_cmd(self, args):
         self.respond("NoGo")
@@ -372,13 +389,26 @@ class GtpConnection():
                      "pstring/Show Board/gogui-rules_board\n"
                      )
 
+# def point_to_coord(point, boardsize):
+#     """
+#     Transform point given as board array index 
+#     to (row, col) coordinate representation.
+#     """
+#     NS = boardsize + 1
+#     return divmod(point, NS)
+
+# From assignment 3
 def point_to_coord(point, boardsize):
     """
     Transform point given as board array index 
     to (row, col) coordinate representation.
+    Special case: PASS is not transformed
     """
-    NS = boardsize + 1
-    return divmod(point, NS)
+    if point == PASS:
+        return PASS
+    else:
+        NS = boardsize + 1
+        return divmod(point, NS)
 
 def format_point(move):
     """
