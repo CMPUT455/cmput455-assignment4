@@ -25,7 +25,7 @@ NULLPOINT = 0
 The largest board we allow. 
 To support larger boards the coordinate printing needs to be changed.
 """
-MAXSIZE = 25
+MAXSIZE = 7
 
 """
 where1d: Helper function for using np.where with 1-d arrays.
